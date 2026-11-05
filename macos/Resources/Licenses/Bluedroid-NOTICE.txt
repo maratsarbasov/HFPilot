@@ -1,0 +1,12 @@
+Bluedroid SBC encoder/decoder, distributed with BTstack.
+https://github.com/bluekitchen/btstack/tree/9edb5d82ea6ec4466a393415d65030929330acdf/3rd-party/bluedroid
+
+Copyright (C) 1999-2012 Broadcom Corporation
+Copyright (C) 2014 The Android Open Source Project
+Copyright 2002 - 2004 Open Interface North America, Inc. All rights reserved.
+Copyright 2003 - 2004 Open Interface North America, Inc. All rights reserved.
+Copyright 2006 Open Interface North America, Inc. All rights reserved.
+const OI_CHAR * OI_Codec_Copyright = "Copyright 2002-2007 Open Interface North America, Inc. All rights reserved";
+context->common.codecInfo = OI_Codec_Copyright;
+
+Licensed under the Apache License, Version 2.0. See Apache-2.0.txt.

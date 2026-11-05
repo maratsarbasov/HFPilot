@@ -1,0 +1,14 @@
+# Private runtime data, recordings and local development outputs.
+.env
+.env.*
+!.env.example
+.work/
+artifacts/
+dist/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.DS_Store
+*.crash
+*.tlv
