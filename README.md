@@ -128,6 +128,8 @@ python3.14 -m venv .venv
 
 `prepare_native.py` fetches the pinned BTstack revision. The build produces `.work/macos-app/HFPilot.app` and `dist/HFPilot-macOS-arm64.zip`. The optional OpenAI tunnel client is not bundled.
 
+Local builds read their version from `VERSION`. Override it with `--version 0.1.1`; `--build-number` sets the separate internal build number. Native code targets macOS 26.3, and the bundle check rejects dependencies requiring a newer OS.
+
 ```sh
 .venv/bin/python -m unittest discover -s tests -v
 .venv/bin/python scripts/check_macos_bundle.py .work/macos-app/HFPilot.app
@@ -143,6 +145,22 @@ These checks use isolated data and fake phone state; they do not make real calls
 | `scripts/` | Dependency preparation, app packaging, and bundle checks. |
 
 Dependency notices are in `macos/Resources/Licenses` and the app bundle. BTstack's noncommercial terms apply.
+
+## Releases
+
+The [release workflow](.github/workflows/release.yml) builds on a GitHub-hosted Apple silicon Mac, runs the offline tests and bundle checks, then uploads the app ZIP and SHA-256 checksum to a GitHub Release. No phone, OpenAI key, signing certificate, or separately configured GitHub token is required. Builds remain ad-hoc signed and are not notarized.
+
+After committing the changes you want to release:
+
+```sh
+git push origin HEAD
+git tag -a v0.1.1 -m "HFPilot 0.1.1"
+git push origin v0.1.1
+```
+
+Use a new tag in `vMAJOR.MINOR.PATCH` format for each release. The tag determines the version inside the app; CI uses its run number as the internal build number. Existing releases are not overwritten.
+
+For a build without publishing, open **Actions → Release macOS app → Run workflow**. Download the result from the run's **Artifacts** section. Manual builds use `VERSION`; keep that file current for local and manual builds. The workflow must first be pushed to the repository's default branch to appear in Actions.
 
 ## Similar projects
 

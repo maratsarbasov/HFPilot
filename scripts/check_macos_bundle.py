@@ -13,7 +13,11 @@ import urllib.error
 import urllib.request
 
 
-def check(app):
+def version_tuple(value):
+    return (tuple(map(int, value.split('.'))) + (0, 0, 0))[:3]
+
+
+def check(app, expected_version=None):
     report = {}
     with tempfile.TemporaryDirectory(prefix="HFPilot relocation ' ") as temporary:
         root = Path(temporary).resolve()
@@ -30,6 +34,11 @@ def check(app):
                 capture_output=True, cwd=root, env=env | (extra_env or {}), timeout=30, check=True)
 
         info = plistlib.loads((moved / 'Contents/Info.plist').read_bytes())
+        if expected_version is not None:
+            assert info['CFBundleShortVersionString'] == expected_version, 'Release tag and app version differ'
+        report['version'] = info['CFBundleShortVersionString']
+        report['build_number'] = info['CFBundleVersion']
+        minimum = version_tuple(info['LSMinimumSystemVersion'])
         assert 'VoiceAgentProjectRoot' not in info
         assert info['CFBundleIconFile'] == 'AppIcon'
         icon = moved / 'Contents/Resources/AppIcon.icns'
@@ -56,7 +65,24 @@ def check(app):
             for line in output.splitlines()[1:]:
                 dependency = line.strip().split(' (', 1)[0]
                 assert dependency.startswith(('@', '/usr/lib/', '/System/Library/')), dependency
+            # Homebrew and wheels can raise their deployment targets independently
+            # of our source. Do not publish a bundle that understates its OS floor.
+            commands = subprocess.check_output(['otool', '-arch', 'arm64', '-l', str(path)], text=True)
+            command, targets = None, []
+            for line in commands.splitlines():
+                fields = line.split()
+                if len(fields) != 2:
+                    continue
+                field, value = fields
+                if field == 'cmd':
+                    command = value
+                elif (command, field) in (('LC_BUILD_VERSION', 'minos'), ('LC_VERSION_MIN_MACOSX', 'version')):
+                    targets.append(version_tuple(value))
+            assert targets, f'Missing macOS deployment target: {path.name}'
+            assert max(targets) <= minimum, f'{path.name} requires macOS {max(targets)}, above {minimum}'
         report['self_contained_mach_o_files'] = libraries
+        report['minimum_macos'] = info['LSMinimumSystemVersion']
+        report['dependency_deployment_targets'] = True
         report['bundle_contains_no_user_data_or_tunnel_client'] = True
         licenses = moved / 'Contents/Resources/Licenses'
         for filename in ('Python.txt', 'BTstack.txt', 'Apache-2.0.txt', 'Bluedroid-NOTICE.txt', 'blueutil.txt'):
@@ -145,8 +171,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('app', type=Path)
     parser.add_argument('--report', type=Path)
+    parser.add_argument('--expected-version', help='Require this version in Info.plist')
     args = parser.parse_args()
-    result = json.dumps(check(args.app.resolve()), indent=2) + '\n'
+    result = json.dumps(check(args.app.resolve(), args.expected_version), indent=2) + '\n'
     if args.report:
         args.report.write_text(result)
     print(result, end='')

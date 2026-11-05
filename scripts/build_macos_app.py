@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import platform
 import plistlib
+import re
 import shutil
 import subprocess
 import sys
@@ -18,6 +19,13 @@ import sysconfig
 ROOT = Path(__file__).resolve().parents[1]
 BUILD = ROOT / '.work/macos-app'
 APP = BUILD / 'HFPilot.app'
+MINIMUM_MACOS = '26.3'
+
+
+def release_version(value):
+    if not re.fullmatch(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', value):
+        raise argparse.ArgumentTypeError('Use a version in MAJOR.MINOR.PATCH format, for example 0.1.1')
+    return value
 
 
 def build_icon(resources):
@@ -39,7 +47,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--ui-only', action='store_true', help='Reuse the already frozen backend for UI iteration')
     parser.add_argument('--zip', action='store_true', help='Create a portable ZIP in dist/')
+    parser.add_argument('--version', type=release_version, default=(ROOT / 'VERSION').read_text().strip(),
+                        help='Application version (defaults to VERSION; release CI uses the Git tag)')
+    parser.add_argument('--build-number', type=int, default=1, help='Positive internal build number')
     opts = parser.parse_args()
+    if opts.build_number < 1:
+        parser.error('--build-number must be positive')
     if sys.platform != 'darwin' or platform.machine() != 'arm64':
         raise SystemExit('This release supports building on Apple silicon Macs only.')
     dependency = ROOT / '.work/deps/btstack'
@@ -51,7 +64,8 @@ def main():
     binary.parent.mkdir(parents=True, exist_ok=True)
     resources = contents / 'Resources'; resources.mkdir(exist_ok=True)
     if not opts.ui_only:
-        freezer_env = dict(os.environ, PYINSTALLER_CONFIG_DIR=str(BUILD / 'freeze-cache'))
+        freezer_env = dict(os.environ, PYINSTALLER_CONFIG_DIR=str(BUILD / 'freeze-cache'),
+                          MACOSX_DEPLOYMENT_TARGET=MINIMUM_MACOS)
         subprocess.run([sys.executable, '-m', 'PyInstaller', '--noconfirm',
             '--distpath', str(BUILD / 'frozen'), '--workpath', str(BUILD / 'freeze-work'),
             str(ROOT / 'macos/HFPilotBackend.spec')], cwd=ROOT, env=freezer_env, check=True)
@@ -60,7 +74,8 @@ def main():
         shutil.copytree(BUILD / 'frozen/HFPilot.app', APP, symlinks=True)
         helper_build = BUILD / 'skywalk-build'
         subprocess.run(['cmake', '-S', str(ROOT / 'macos/Skywalk'),
-            '-B', str(helper_build), '-DCMAKE_BUILD_TYPE=Release'], check=True)
+            '-B', str(helper_build), '-DCMAKE_BUILD_TYPE=Release',
+            '-DCMAKE_OSX_DEPLOYMENT_TARGET=' + MINIMUM_MACOS], check=True)
         subprocess.run(['cmake', '--build', str(helper_build), '--target', 'skywalk-hfp', '-j', '4'], check=True)
         helpers = contents / 'Helpers'; helpers.mkdir(exist_ok=True)
         blueutil = shutil.which('blueutil')
@@ -90,7 +105,7 @@ def main():
     os.chmod(resources / 'OpenAI Tunnel.command', 0o755)
     cache = BUILD / 'module-cache'; cache.mkdir(exist_ok=True)
     subprocess.run(['xcrun', 'swiftc', '-O', '-swift-version', '5', '-module-cache-path', str(cache),
-                    '-target', platform.machine() + '-apple-macos13.0',
+                    '-target', platform.machine() + '-apple-macos' + MINIMUM_MACOS,
                     '-framework', 'Cocoa', '-framework', 'CoreBluetooth', '-framework', 'AVFoundation',
                     *[str(p) for p in sorted((ROOT / 'macos/VoiceAgent').glob('*.swift'))],
                     '-o', str(binary)], check=True)
@@ -98,11 +113,12 @@ def main():
         'CFBundleName': 'HFPilot', 'CFBundleDisplayName': 'HFPilot',
         'CFBundleIdentifier': 'local.voice-agent.menubar', 'CFBundleExecutable': 'HFPilot',
         'CFBundleIconFile': 'AppIcon',
-        'CFBundlePackageType': 'APPL', 'CFBundleVersion': '2', 'CFBundleShortVersionString': '0.1.0',
+        'CFBundlePackageType': 'APPL', 'CFBundleVersion': str(opts.build_number),
+        'CFBundleShortVersionString': opts.version,
         'LSUIElement': True, 'LSMultipleInstancesProhibited': True,
         'NSPrincipalClass': 'VoiceAgentApplication',
-        # Do not advertise an untested lower OS target for the frozen dependencies.
-        'LSMinimumSystemVersion': platform.mac_ver()[0], 'NSHighResolutionCapable': True,
+        # The bundle checker rejects dependencies requiring a newer macOS.
+        'LSMinimumSystemVersion': MINIMUM_MACOS, 'NSHighResolutionCapable': True,
         'NSAppTransportSecurity': {'NSAllowsLocalNetworking': True},
         'NSBluetoothAlwaysUsageDescription': 'HFPilot connects to your phone to answer calls and carry audio for your assistant.',
     }

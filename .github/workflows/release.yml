@@ -1,0 +1,106 @@
+name: Release macOS app
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 45
+    env:
+      MACOSX_DEPLOYMENT_TARGET: '26.3'
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Select version
+        id: version
+        shell: bash
+        run: |
+          version="$(cat VERSION)"
+          if [[ "$GITHUB_EVENT_NAME" == push ]]; then
+            version="${GITHUB_REF_NAME#v}"
+          fi
+          if [[ ! "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo 'Expected a version such as 0.1.1 (tag v0.1.1).'
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Install build dependencies
+        run: |
+          brew install python@3.14 cmake blueutil
+          "$(brew --prefix python@3.14)/bin/python3.14" -m venv .venv
+          .venv/bin/python -m pip install -r requirements-build.txt
+          .venv/bin/python scripts/prepare_native.py
+
+      - name: Run offline tests
+        run: .venv/bin/python -m unittest discover -s tests -v
+
+      - name: Build and check app
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          .venv/bin/python scripts/build_macos_app.py --zip \
+            --version "$RELEASE_VERSION" --build-number "$GITHUB_RUN_NUMBER"
+          .venv/bin/python scripts/check_macos_bundle.py .work/macos-app/HFPilot.app \
+            --expected-version "$RELEASE_VERSION" --report dist/bundle-report.json
+          (cd dist && shasum -a 256 HFPilot-macOS-arm64.zip > SHA256SUMS)
+          cat > dist/release-notes.md <<'NOTES'
+          Download **HFPilot-macOS-arm64.zip**, unzip it, and move HFPilot.app to Applications.
+
+          - Requires Apple silicon, macOS 26.3+, and your own OpenAI API key.
+          - Native macOS Bluetooth is disabled while the assistant owns the controller; Bluetooth mice, keyboards, and headphones disconnect.
+          - Ad-hoc signed, not notarized. If blocked, follow [Apple's instructions](https://support.apple.com/en-us/102445).
+          - Bundled BTstack is restricted to non-commercial use; its license is included in the app.
+
+          Automated checks cover packaging and offline behavior, not real phone calls or Bluetooth hardware compatibility.
+          NOTES
+
+      - name: Save checked build
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: HFPilot-macOS-arm64
+          path: |
+            dist/HFPilot-macOS-arm64.zip
+            dist/SHA256SUMS
+            dist/bundle-report.json
+            dist/release-notes.md
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+  publish:
+    # Manual runs only build an artifact. A pushed version tag publishes a release.
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: HFPilot-macOS-arm64
+          path: dist
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          (cd dist && sha256sum --check SHA256SUMS)
+          gh release create "$RELEASE_TAG" \
+            dist/HFPilot-macOS-arm64.zip dist/SHA256SUMS \
+            --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --title "HFPilot $RELEASE_TAG" --generate-notes --notes-file dist/release-notes.md
