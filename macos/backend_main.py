@@ -60,7 +60,7 @@ def main():
 if __name__ == '__main__':
     try:
         sys.exit(main())
-    except (ValueError, OSError) as error:
+    except (ValueError, OSError, RuntimeError) as error:
         print(str(error), file=sys.stderr)
         sys.exit(1)
     except (KeyboardInterrupt, EOFError):

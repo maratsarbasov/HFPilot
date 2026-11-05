@@ -69,6 +69,14 @@ def check(app):
         overview = json.loads(run('bench', 'desktop', input='{"action":"overview"}').stdout)
         assert not overview['api_key_configured'] and overview['phone'] is None
         assert overview['configuration_error'] is None and not overview['calls']
+        # Fresh installations must explain missing credentials without crashing
+        # the frozen entry point or acquiring Bluetooth. This profile has no key.
+        missing_key = subprocess.run([str(backend), 'server', '--port', '0'],
+            capture_output=True, text=True, cwd=root, env=env, timeout=15)
+        assert missing_key.returncode == 1
+        assert missing_key.stderr.strip() == 'Add your OpenAI API key in Settings before turning on the assistant.'
+        assert not (data / '.work/macos-hfp').exists()
+        report['missing_key_startup_message'] = True
         prompt = data / 'prompts/incoming.txt'
         prompt.write_text('Keep my edited instructions.\n')
         run('check')

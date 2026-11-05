@@ -11,6 +11,7 @@ from .journal import dump
 from .ending import EndCall
 from .caller import caller_context
 from .config import ROOT, response_settings
+from .paths import FROZEN
 
 
 def api_key():
@@ -18,6 +19,8 @@ def api_key():
     path = ROOT / '.env'
     if not value and path.exists():
         if path.stat().st_mode & 0o077:
+            if FROZEN:
+                raise RuntimeError('Save your OpenAI API key again in Settings to secure its local storage.')
             raise RuntimeError('Protect .env with chmod 600 before using it')
         # A tiny literal parser, never source/execute a credentials file.
         for line in path.read_text().splitlines():
@@ -26,6 +29,8 @@ def api_key():
                 value = data.strip().strip('\"\'')
                 break
     if not value:
+        if FROZEN:
+            raise RuntimeError('Add your OpenAI API key in Settings before turning on the assistant.')
         raise RuntimeError('Set OPENAI_API_KEY in the environment or the project .env (mode 600)')
     return value
 
