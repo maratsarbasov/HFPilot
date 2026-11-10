@@ -66,6 +66,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CBCent
         menu.addItem(.separator())
         add("Conversations…", #selector(conversations), key: "1")
         add("Instructions…", #selector(instructions), key: "2")
+        add("Test Call…", #selector(testCall), key: "3")
         add("Settings…", #selector(settings), key: ",")
         menu.addItem(.separator())
         add("Quit HFPilot", #selector(quit), key: "q")
@@ -143,8 +144,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CBCent
             phoneLine.title = "Retrying automatically"
             symbol = "questionmark.circle"
         } else if active {
-            stateLine.title = enabled ? "On a call" : "Pausing after this call"
-            phoneLine.title = "\(name) · Connected"
+            let testing = runtime["active_test_call"] as? Bool == true
+            stateLine.title = testing ? "Test call" : (enabled ? "On a call" : "Pausing after this call")
+            phoneLine.title = testing ? "Default microphone and output" : "\(name) · Connected"
             symbol = "phone.fill"
             color = .systemGreen
         } else if let error = runtime["hardware_error"] as? String ?? lastError {
@@ -379,6 +381,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, CBCent
     }
     @objc private func conversations() { openLibraryFromMenu(0) }
     @objc private func instructions() { openLibraryFromMenu(1) }
+    @objc private func testCall() { openLibraryFromMenu(3) }
     @objc private func settings() { openLibraryFromMenu(2) }
     @objc private func quit() { NSApp.terminate(nil) }
     @objc private func endCall() {

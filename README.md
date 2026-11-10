@@ -65,6 +65,14 @@ The release is ad-hoc signed, not notarized. If macOS blocks it, use Apple's [in
 
 Outgoing calls receive a separate assignment with the number and task through MCP. Both live models receive the assignment. Each call snapshots its instructions and configuration, so later edits do not change an ongoing conversation or its report.
 
+### Test a call before using the phone
+
+Open **Test Call** from the menu or sidebar. Choose **Incoming** (you play the caller) or **Outgoing** (you play the person being called), then enter the assistant's instructions. **Use Incoming Instructions** copies the current Instructions draft without saving or changing it.
+
+Each direction keeps its own instruction draft. Click **Start Test** and allow microphone access when macOS asks. Speak through the Mac's default input device; the assistant plays through the default output device selected in **System Settings → Sound**. Voice processing reduces speaker echo. If you change audio devices during a test, start a new test to use the new defaults.
+
+Tests work while the phone assistant is paused and do not require a paired phone or dial a number. They use the same voice model, delegation, greetings, and ending behavior as real calls, so an API key and normal model usage are required. One conversation can run at a time. Click **End Test** to finish early, then **View Result** to open that test's transcript and report in **Conversations**. You can review the transcript or start another test while the report is being prepared. The audio recording preference also applies to tests.
+
 The installed app keeps these files under `~/Library/Application Support/HFPilot/`:
 
 | Path | Purpose |
@@ -136,6 +144,12 @@ Local builds read their version from `VERSION`. Override it with `--version 0.1.
 ```
 
 These checks use isolated data and fake phone state; they do not make real calls or validate Bluetooth hardware.
+
+To validate local test-call audio on a Mac, first grant HFPilot microphone access,
+then run `.venv/bin/python scripts/check_local_audio.py /Applications/HFPilot.app`.
+This opt-in hardware check plays silence through the default output, verifies
+microphone PCM and repeated startup/shutdown, and discards captured audio. It
+does not connect to a model or save a recording.
 
 | Directory | Contents |
 | --- | --- |

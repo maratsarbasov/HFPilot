@@ -133,6 +133,10 @@ def desktop_request(data, payload):
     action = payload.get('action')
     if action == 'overview':
         return desktop.overview()
+    if action == 'test_call':
+        if payload.get('command') == 'start' and not alive(data.get('server', {})):
+            start_server(data, paused=True)
+        return request_local('/local/test-call', payload, timeout=5)
     if action == 'save_recording':
         return desktop.save_recording(payload.get('enabled'))
     if action == 'connection_address':
@@ -207,7 +211,8 @@ def main():
             print(json.dumps({'error': 'Invalid desktop request'}))
             raise SystemExit(1)
         # Read-only windows stay usable while a control command holds the lock.
-        if payload.get('action') in ('overview', 'call_details'):
+        if payload.get('action') in ('overview', 'call_details') or (
+                payload.get('action') == 'test_call' and payload.get('command') == 'status'):
             desktop_response({}, payload)
             return
     # Serialize local UI/CLI actions; a second click/process cannot spawn duplicates.

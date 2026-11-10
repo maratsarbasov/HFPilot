@@ -121,6 +121,7 @@ def main():
         'LSMinimumSystemVersion': MINIMUM_MACOS, 'NSHighResolutionCapable': True,
         'NSAppTransportSecurity': {'NSAllowsLocalNetworking': True},
         'NSBluetoothAlwaysUsageDescription': 'HFPilot connects to your phone to answer calls and carry audio for your assistant.',
+        'NSMicrophoneUsageDescription': 'HFPilot uses your microphone so you can talk to the assistant in a test call.',
     }
     (contents / 'Info.plist').write_bytes(plistlib.dumps(info))
     os.chmod(binary, 0o755)

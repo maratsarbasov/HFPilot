@@ -45,6 +45,11 @@ import Darwin
     }
 }
 
+if CommandLine.arguments.contains("--test-audio") {
+    LocalTestAudio.run()
+    exit(0)
+}
+
 let application = MenuApplication.shared
 let delegate = AppDelegate()
 application.setActivationPolicy(.accessory)

@@ -36,6 +36,25 @@ class OutgoingNotConnected(Exception):
         super().__init__(outcome)
 
 
+async def test_setup(operation, stop, timeout):
+    """Allow End Test Call during API connection or local audio startup."""
+    work = asyncio.create_task(operation)
+    stopped = asyncio.create_task(stop.wait())
+    try:
+        done, _ = await asyncio.wait((work, stopped), timeout=timeout,
+                                     return_when=asyncio.FIRST_COMPLETED)
+        if stop.is_set():
+            raise OutgoingNotConnected('stopped')
+        if work not in done:
+            raise TimeoutError('Test call setup timed out')
+        return work.result()
+    finally:
+        for task in (work, stopped):
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(work, stopped, return_exceptions=True)
+
+
 async def wait_outgoing(phone, call, seconds, stop, live, journal):
     deadline = time.monotonic() + seconds
     previous = None
@@ -66,6 +85,7 @@ async def wait_outgoing(phone, call, seconds, stop, live, journal):
 
 async def handle_call(args, api, phone, gateway, call, stop, expired, listener=None, ticket=None):
     outgoing = args.command == 'dial'
+    local_test = phone.name == 'local-test'
     agent, assignment, assignment_path = load_call_settings(args.config, args.assignment)
     record_audio = recording_enabled(getattr(args, 'recording_preference_path', None), args.record_audio)
     now = datetime.now(agent.timezone)
@@ -82,13 +102,15 @@ async def handle_call(args, api, phone, gateway, call, stop, expired, listener=N
                 'reasoning_model': agent.data['delegation']['model'],
                 'summary_model': agent.data['summary']['model'],
                 'config_path': str(agent.path), 'assignment_path': str(assignment_path),
-                'outcome': 'starting', 'test_call': args.test_call,
+                'outcome': 'starting', 'test_call': args.test_call or local_test,
                 'summary_status': 'pending', 'caller': unknown_caller(), 'record_audio': record_audio}
     if getattr(args, 'call_id', None):
         metadata.update(mcp_call_id=args.call_id, context_revision=args.context_revision)
     if outgoing:
         metadata.update(dialed_number=args.number, dial_timeout_seconds=args.dial_timeout,
-                        dial_method='hfp_atd', calling_app=None)
+                        dial_method='local_test' if local_test else 'hfp_atd', calling_app=None)
+    if local_test:
+        metadata['mode'] = 'local-test'
     dump(directory / 'metadata.json', metadata)
     emit('call-starting', directory=str(directory), call=call)
     bridge = phone.audio(journal, args.input_gain, args.output_gain, record_audio)
@@ -108,12 +130,17 @@ async def handle_call(args, api, phone, gateway, call, stop, expired, listener=N
             emit('caller-updated', directory=str(directory), call=call, caller=caller)
             live.update_caller(caller)
     try:
+        if local_test and stop.is_set():
+            raise OutgoingNotConnected('stopped')
         if outgoing:
             if stop.is_set():
                 raise OutgoingNotConnected('stopped')
             config = configuration(agent, assignment, now.isoformat(),
-                                   outgoing_number=args.number)
-            await asyncio.wait_for(live.connect(config), 25)
+                                   outgoing_number=args.number, direction='outgoing')
+            if local_test:
+                await test_setup(live.connect(config), stop, 25)
+            else:
+                await asyncio.wait_for(live.connect(config), 25)
             if stop.is_set():
                 raise OutgoingNotConnected('stopped')
             # Both Python and C check idle state before the single ATD request.
@@ -131,7 +158,10 @@ async def handle_call(args, api, phone, gateway, call, stop, expired, listener=N
             config = configuration(agent, assignment, now.isoformat(), caller)
             if stop.is_set() or not current(listener, ticket) or phone.read()[1] != {call: 'incoming'}:
                 raise RuntimeError('Incoming call changed while collecting caller ID; leaving it untouched')
-            await asyncio.wait_for(live.connect(config), 25)
+            if local_test:
+                await test_setup(live.connect(config), stop, 25)
+            else:
+                await asyncio.wait_for(live.connect(config), 25)
             calls = phone.read()[1]
             if stop.is_set() or not current(listener, ticket) or calls != {call: 'incoming'}:
                 raise RuntimeError('Incoming call changed before answer; leaving it untouched')
@@ -145,7 +175,10 @@ async def handle_call(args, api, phone, gateway, call, stop, expired, listener=N
                     raise RuntimeError('Call did not become active')
                 await asyncio.sleep(.1)
         metadata['connected_at'] = datetime.now(agent.timezone).isoformat()
-        await bridge.start()
+        if local_test:
+            await test_setup(bridge.start(), stop, 12)
+        else:
+            await bridge.start()
         refresh_caller()
         if outgoing:
             live.greet(outgoing=True)
@@ -153,6 +186,8 @@ async def handle_call(args, api, phone, gateway, call, stop, expired, listener=N
             live.greet()
         emit('conversation-ready', directory=str(directory))
         journal.event('conversation-ready')
+        if getattr(args, 'on_connected', None):
+            args.on_connected()
         deadline = time.monotonic() + args.max_call
         while True:
             calls = phone.read()[1]

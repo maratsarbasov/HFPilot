@@ -160,7 +160,8 @@ class MCP:
             return self.get_call(args['call_id'], args.get('include_transcript', False))
         if name == 'list_calls':
             jobs = list(self.state.data['jobs'].values())[-args.get('limit', 10):]
-            return {'calls': [{k: j[k] for k in ('call_id', 'direction', 'number', 'status', 'created_at')}
+            return {'calls': [{**{k: j[k] for k in ('call_id', 'direction', 'number', 'status', 'created_at')},
+                               'test_call': j.get('test_call', False)}
                               for j in reversed(jobs)]}
         if name == 'get_incoming_context':
             return self.state.context()
@@ -374,6 +375,33 @@ def make_app(mcp, token, *, origins=(), lifecycle=True, oauth=None, local_token=
             return web.json_response({'error': str(error)}, status=409)
         return web.json_response(result)
     app.router.add_post('/local/control', local_control)
+
+    async def local_test_call(request):
+        require_owner(request)
+        try:
+            payload = await request.json()
+            if not isinstance(payload, dict):
+                raise ValueError('Invalid test call request')
+            command = payload.get('command')
+            if command == 'start':
+                job = mcp.runtime.start_test_call(payload.get('direction'), payload.get('assignment'))
+            else:
+                if not isinstance(payload.get('call_id'), str):
+                    raise ValueError('A test call ID is required')
+                job = mcp.state.job(payload.get('call_id'))
+                if not job.get('local_test'):
+                    raise ValueError('This is not a local test call')
+                if command == 'stop':
+                    mcp.runtime.cancel_call(job['call_id'])
+                elif command != 'status':
+                    raise ValueError('Unknown test call command')
+            result = mcp.get_call(job['call_id'])
+            result['assignment'] = (mcp.state.root / 'jobs' / job['call_id'] / 'assignment.txt').read_text()
+            result['conversation_id'] = Path(job['directory']).name if job.get('directory') else None
+            return web.json_response(result)
+        except (ValueError, RuntimeError) as error:
+            return web.json_response({'error': str(error)}, status=409)
+    app.router.add_post('/local/test-call', local_test_call)
     oauth.routes(app)
     if lifecycle:
         async def manage(app):

@@ -99,6 +99,22 @@ class LocalControlTests(unittest.TestCase):
             self.main('local-only')
             start.assert_not_called()
 
+    def test_first_test_call_starts_a_paused_server_and_keeps_status_readonly(self):
+        payload = {'action': 'test_call', 'command': 'start', 'direction': 'outgoing', 'assignment': 'Rehearse'}
+        with patch.object(bench, 'alive', return_value=False), \
+             patch.object(bench, 'start_server') as start, \
+             patch.object(bench, 'request_local', return_value={'call_id': 'test'}) as request:
+            self.assertEqual(bench.desktop_request(self.data, payload), {'call_id': 'test'})
+            start.assert_called_once_with(self.data, paused=True)
+            request.assert_called_once_with('/local/test-call', payload, timeout=5)
+        with (self.root / 'control.lock').open('a') as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            status = {'action': 'test_call', 'command': 'status', 'call_id': 'test'}
+            with patch('sys.stdin', io.StringIO(json.dumps(status))), \
+                 patch.object(bench, 'desktop_request', return_value={'status': 'running'}) as read:
+                self.main('desktop')
+                read.assert_called_once_with({}, status)
+
     def test_restart_preserves_pause_and_refuses_calls_or_pending_summaries(self):
         for enabled, call, pending in ((False, None, 0), (True, None, 0),
                                        (True, 'active', 0), (False, None, 1)):

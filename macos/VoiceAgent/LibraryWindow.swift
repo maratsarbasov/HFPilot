@@ -10,7 +10,15 @@ final class LibraryWindow: NSWindowController, NSTableViewDataSource, NSTableVie
     private let openBluetooth: () -> Void
     private let pages = NSView()
     private let sidebar = NSTableView()
-    private static let pageNames = ["Conversations", "Instructions", "Settings"]
+    private static let pageNames = ["Conversations", "Instructions", "Settings", "Test Call"]
+    private lazy var testCall = TestCallPane(bridge: bridge, incomingInstructions: { [weak self] in
+        self?.editor.string ?? ""
+    }, showConversations: { [weak self] id in
+        self?.selectedID = id
+        self?.present(page: 0)
+    }, showSettings: { [weak self] in
+        self?.present(page: 2)
+    })
     private static let pageTitleID = NSToolbarItem.Identifier("HFPilot.pageTitle")
     private let pageTitle = NSTextField(labelWithString: "")
     private var pageViews: [NSView] = []
@@ -21,6 +29,11 @@ final class LibraryWindow: NSWindowController, NSTableViewDataSource, NSTableVie
     private var renderedDetail: (String, Bool, String)?
     private let table = NSTableView()
     private var calls: [[String: Any]] = []
+    private let callsContent = NSView()
+    private let emptyCalls = NSView()
+    private let emptyCallsTitle = NSTextField(labelWithString: "Loading conversations…")
+    private let emptyCallsNote = NSTextField(wrappingLabelWithString: "")
+    private let emptyCallsAction = NSButton(title: "Try a Test Call", target: nil, action: nil)
     private let callTitle = NSTextField(labelWithString: "Conversations")
     private let callSubtitle = NSTextField(wrappingLabelWithString: "Select a conversation to read its result.")
     private let detail = NSTextView()
@@ -168,7 +181,7 @@ final class LibraryWindow: NSWindowController, NSTableViewDataSource, NSTableVie
             sidebarScroll.trailingAnchor.constraint(equalTo: sidebarBackground.trailingAnchor),
             sidebarScroll.bottomAnchor.constraint(equalTo: sidebarBackground.bottomAnchor)
         ])
-        pageViews = [buildCalls(), buildInstructions(), buildSettings()]
+        pageViews = [buildCalls(), buildInstructions(), buildSettings(), testCall]
         for view in pageViews { view.translatesAutoresizingMaskIntoConstraints = false; pages.addSubview(view) }
         // A real sidebar pane lets AppKit carry its material behind the window
         // controls and position the title above the detail column.
@@ -230,6 +243,8 @@ final class LibraryWindow: NSWindowController, NSTableViewDataSource, NSTableVie
         table.setAccessibilityLabel("Conversations")
         let list = NSScrollView()
         list.hasVerticalScroller = true
+        list.autohidesScrollers = true
+        list.drawsBackground = false
         list.documentView = table
         list.widthAnchor.constraint(equalToConstant: 235).isActive = true
         callTitle.font = .systemFont(ofSize: 21, weight: .semibold)
@@ -249,7 +264,7 @@ final class LibraryWindow: NSWindowController, NSTableViewDataSource, NSTableVie
         audioLabel.font = .systemFont(ofSize: 11)
         let audio = horizontal([playButton, audioLabel])
         let right = vertical([callTitle, callSubtitle, detailMode, text, audio])
-        let container = NSView()
+        let container = callsContent
         right.translatesAutoresizingMaskIntoConstraints = false
         list.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(list)
@@ -265,8 +280,47 @@ final class LibraryWindow: NSWindowController, NSTableViewDataSource, NSTableVie
             text.widthAnchor.constraint(equalTo: right.widthAnchor),
             callSubtitle.widthAnchor.constraint(equalTo: right.widthAnchor)
         ])
-        return container
+        let emptyIcon = NSImageView(image: NSImage(systemSymbolName: "bubble.left.and.bubble.right", accessibilityDescription: nil)!)
+        emptyIcon.contentTintColor = .secondaryLabelColor
+        emptyIcon.imageScaling = .scaleProportionallyUpOrDown
+        emptyIcon.widthAnchor.constraint(equalToConstant: 42).isActive = true
+        emptyIcon.heightAnchor.constraint(equalToConstant: 42).isActive = true
+        emptyCallsTitle.font = .systemFont(ofSize: 21, weight: .semibold)
+        emptyCallsTitle.alignment = .center
+        emptyCallsNote.font = .systemFont(ofSize: 13)
+        emptyCallsNote.textColor = .secondaryLabelColor
+        emptyCallsNote.alignment = .center
+        emptyCallsAction.target = self
+        emptyCallsAction.action = #selector(openTestCall)
+        emptyCallsAction.bezelStyle = .rounded
+        emptyCallsAction.isHidden = true
+        let welcome = vertical([emptyIcon, emptyCallsTitle, emptyCallsNote, emptyCallsAction], spacing: 12)
+        welcome.alignment = .centerX
+        welcome.translatesAutoresizingMaskIntoConstraints = false
+        emptyCalls.addSubview(welcome)
+        NSLayoutConstraint.activate([
+            welcome.centerXAnchor.constraint(equalTo: emptyCalls.centerXAnchor),
+            welcome.centerYAnchor.constraint(equalTo: emptyCalls.centerYAnchor, constant: -24),
+            welcome.widthAnchor.constraint(lessThanOrEqualToConstant: 400),
+            welcome.widthAnchor.constraint(lessThanOrEqualTo: emptyCalls.widthAnchor, constant: -48),
+            emptyCallsNote.widthAnchor.constraint(equalTo: welcome.widthAnchor)
+        ])
+        let page = NSView()
+        for view in [callsContent, emptyCalls] {
+            view.translatesAutoresizingMaskIntoConstraints = false
+            page.addSubview(view)
+            NSLayoutConstraint.activate([
+                view.leadingAnchor.constraint(equalTo: page.leadingAnchor),
+                view.trailingAnchor.constraint(equalTo: page.trailingAnchor),
+                view.topAnchor.constraint(equalTo: page.topAnchor),
+                view.bottomAnchor.constraint(equalTo: page.bottomAnchor)
+            ])
+        }
+        callsContent.isHidden = true
+        return page
     }
+
+    @objc private func openTestCall() { present(page: 3) }
 
     private func buildInstructions() -> NSView {
         editor.delegate = self
@@ -417,6 +471,7 @@ final class LibraryWindow: NSWindowController, NSTableViewDataSource, NSTableVie
         RunLoop.main.perform(inModes: [.default]) { [weak self] in self?.bringToFront() }
     }
     private func selectPage(_ index: Int) {
+        if index == 3 { player?.stop(); player = nil }
         pageTitle.stringValue = Self.pageNames[index]
         window?.title = pageTitle.stringValue
         for (position, view) in pageViews.enumerated() { view.isHidden = position != index }
@@ -429,7 +484,14 @@ final class LibraryWindow: NSWindowController, NSTableViewDataSource, NSTableVie
         bridge.data("overview") { [weak self] result in
             guard let self = self else { return }
             self.overviewLoading = false
-            guard result.code == 0 else { self.showMessage(result.error); return }
+            guard result.code == 0 else {
+                if self.calls.isEmpty {
+                    self.emptyCallsTitle.stringValue = "Conversations unavailable"
+                    self.emptyCallsNote.stringValue = result.error
+                }
+                self.showMessage(result.error)
+                return
+            }
             let data = result.object
             self.recordingSettings = data["recording"] as? [String: Any] ?? [:]
             self.configured = data["api_key_configured"] as? Bool == true
@@ -455,16 +517,28 @@ final class LibraryWindow: NSWindowController, NSTableViewDataSource, NSTableVie
             }
             if let error = data["configuration_error"] as? String { self.showMessage(error) }
             self.calls = data["calls"] as? [[String: Any]] ?? []
+            self.callsContent.isHidden = self.calls.isEmpty
+            self.emptyCalls.isHidden = !self.calls.isEmpty
+            self.emptyCallsTitle.stringValue = "No conversations yet"
+            self.emptyCallsNote.stringValue = "Try a call with your assistant. Transcripts, summaries and recordings will appear here."
+            self.emptyCallsAction.isHidden = false
             self.table.reloadData()
             if let id = self.selectedID, let row = self.calls.firstIndex(where: { $0["id"] as? String == id }) {
                 self.table.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
-                self.showDetail()
+                self.loadSelectedCall()
             } else if !self.calls.isEmpty {
                 self.table.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
                 self.tableViewSelectionDidChange(Notification(name: NSTableView.selectionDidChangeNotification))
-            } else { self.detail.string = "Your conversations will appear here after the first call." }
+            } else {
+                self.selectedID = nil
+                self.details = [:]
+                self.player?.stop()
+                self.player = nil
+            }
             self.saveButton.isEnabled = self.dirty && !self.revision.isEmpty
             self.renderPreferences()
+            self.testCall.update(configured: self.configured, runtime: self.runtime, operation: self.operation,
+                                 recording: self.recordingSettings)
         }
     }
 
@@ -475,6 +549,7 @@ final class LibraryWindow: NSWindowController, NSTableViewDataSource, NSTableVie
         answering = enabled
         statusKnown = known
         renderPreferences()
+        testCall.update(configured: configured, runtime: runtime, operation: operation, recording: recordingSettings)
     }
     private func renderPreferences() {
         let state = runtime
@@ -498,7 +573,7 @@ final class LibraryWindow: NSWindowController, NSTableViewDataSource, NSTableVie
         let recording = state["recording"] as? [String: Any] ?? recordingSettings
         let recordingOverride = recording["overridden"] as? Bool == true
         let recordingDetail = savingRecording ? "Saving…" : recordingOverride ? "Controlled by a command-line option. Restart from HFPilot to change it." :
-            recording["error"] as? String ?? "Incoming and outgoing calls. Saved on this Mac. Changes apply to future calls."
+            recording["error"] as? String ?? "Saved on this Mac. Applies to future calls and tests."
         let note = settingsMessage ?? ((!savedPhone || !configured) ? "Add your iPhone and API key to get started. While answering calls, HFPilot uses your Mac’s Bluetooth controller; other Bluetooth accessories reconnect after you pause." : nil)
         let display = SettingsDisplay(status: statusText, enabled: enabled,
             canToggle: statusKnown && operation == nil && (enabled || (configured && savedPhone)), activeCall: active,
@@ -539,7 +614,7 @@ final class LibraryWindow: NSWindowController, NSTableViewDataSource, NSTableVie
         if tableView === sidebar {
             let title = NSTextField(labelWithString: Self.pageNames[row])
             title.font = .systemFont(ofSize: 13)
-            let icon = NSImageView(image: NSImage(systemSymbolName: ["phone", "text.alignleft", "gearshape"][row], accessibilityDescription: nil)!)
+            let icon = NSImageView(image: NSImage(systemSymbolName: ["phone", "text.alignleft", "gearshape", "mic"][row], accessibilityDescription: nil)!)
             icon.contentTintColor = .secondaryLabelColor
             cell.textField = title
             cell.imageView = icon
@@ -592,6 +667,10 @@ final class LibraryWindow: NSWindowController, NSTableViewDataSource, NSTableVie
         let id = calls[row]["id"] as? String ?? ""
         selectedID = id
         details = [:]
+        loadSelectedCall()
+    }
+    private func loadSelectedCall() {
+        guard let id = selectedID else { return }
         showDetail()
         bridge.data("call_details", values: ["id": id]) { [weak self] result in
             guard let self = self, self.selectedID == id else { return }

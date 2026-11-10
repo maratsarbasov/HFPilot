@@ -57,7 +57,8 @@ class State:
         except KeyError:
             raise ValueError('Unknown call_id') from None
 
-    def create_job(self, direction, assignment, *, number=None, request_id=None, context_revision=None):
+    def create_job(self, direction, assignment, *, number=None, request_id=None, context_revision=None,
+                   local_test=False):
         fingerprint = hashlib.sha256(canonical([number, assignment]).encode()).hexdigest()
         if request_id:
             for job in self.data['jobs'].values():
@@ -73,6 +74,8 @@ class State:
                'request_id': request_id, 'fingerprint': fingerprint,
                'context_revision': context_revision, 'status': 'queued',
                'created_at': utcnow(), 'directory': None, 'result': None}
+        if local_test:
+            job['test_call'] = job['local_test'] = True
         self.data['jobs'][ident] = job
         self.save()
         return job, True
@@ -100,6 +103,8 @@ class State:
         # Completion and its delivery entries are committed in the same state write.
         payload = {k: job[k] for k in ('call_id', 'direction', 'number', 'context_revision')}
         payload['result'] = result
+        if job.get('test_call'):
+            payload['test_call'] = True
         self.publish('call.completed', payload, 'evt_completed_' + ident)
 
     def recover(self):

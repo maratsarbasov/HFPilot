@@ -31,7 +31,9 @@ def summary_text(summary, metadata):
             sections.append((title + '\n' if title else '') + value.strip())
     if sections:
         return '\n\n'.join(sections)
-    if metadata.get('summary_status') == 'pending':
+    if metadata.get('outcome') == 'starting' and not metadata.get('finished_at'):
+        return 'Call in progress. Open Transcript to read the conversation so far.'
+    if metadata.get('summary_status') in ('pending', 'running'):
         return 'The summary is being saved. You can read the transcript now.'
     return 'No summary is available for this conversation.'
 
@@ -49,6 +51,8 @@ def conversations():
             caller = {}
         summary = read_json(directory / 'summary.json')
         title = caller.get('name') or caller.get('number') or metadata.get('dialed_number') or 'Unknown caller'
+        if metadata.get('backend') == 'local-test':
+            title = 'Test call · ' + metadata.get('direction', 'incoming').capitalize()
         entries.append({'id': directory.name, 'title': display_name(str(title)),
             'direction': metadata.get('direction', 'incoming'),
             'outcome': metadata.get('outcome', 'unknown'),

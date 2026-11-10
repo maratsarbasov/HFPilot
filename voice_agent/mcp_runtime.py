@@ -15,6 +15,7 @@ from .skywalk import dial_number
 from .mcp_state import utcnow
 from . import phone_profile, recording
 from .paths import native_helper
+from .local_audio import LocalTestPhone
 
 RECONNECT_DELAY = 5
 
@@ -44,6 +45,7 @@ class Runtime:
 
     def status(self):
         return {'active_call_id': self.active, 'listening': dict(self.listening),
+                'active_test_call': bool(self.state.data['jobs'].get(self.active, {}).get('local_test')),
                 'enabled': self.enabled,
                 'bluetooth_connected': self.phone is not None and self.listening['status'] in ('listening', 'pausing'),
                 'phone_name': getattr(self.args, 'phone_name', 'iPhone'),
@@ -281,13 +283,30 @@ class Runtime:
         task.add_done_callback(self.tasks.discard)
         return task
 
+    def start_test_call(self, direction, assignment):
+        if self.closing or self.pairing:
+            raise ValueError('Wait for phone setup or shutdown to finish')
+        if self.active:
+            raise ValueError('Finish the current call before starting a test')
+        if direction not in ('incoming', 'outgoing'):
+            raise ValueError('Choose incoming or outgoing')
+        if not isinstance(assignment, str) or not 1 <= len(assignment.strip()) <= 32000:
+            raise ValueError('Enter instructions between 1 and 32000 characters')
+        load_call_settings(self.args.config, self.state.context_path)
+        api_key()
+        LocalTestPhone.validate()
+        job, _ = self.state.create_job(direction, assignment, local_test=True)
+        self.launch(job)
+        return job
+
     async def run_call(self, job, stop, listener=None, ticket=None):
         ident = job['call_id']
         result = None
         key = None
+        local_test = job.get('local_test', False)
         try:
             key = api_key()
-            phone = await self.ensure_phone()
+            phone = LocalTestPhone(job['direction']) if local_test else await self.ensure_phone()
             if stop.is_set():
                 raise RuntimeError('Call cancelled before setup')
             args = SimpleNamespace(**vars(self.args))
@@ -296,19 +315,28 @@ class Runtime:
             args.assignment = self.state.root / 'jobs' / ident / 'assignment.txt'
             args.call_id = ident
             args.context_revision = job['context_revision']
+            if local_test:
+                args.test_call = True
+                args.address = phone.address
+                def connected():
+                    job['phase'] = 'connected'
+                    job['connected_at'] = utcnow()
+                    self.state.save()
+                args.on_connected = connected
             if ticket is None:
                 gateway, call = phone.address, phone.outgoing_call()
             else:
                 gateway, call = ticket.gateway, ticket.path
             job.update(status='running', started_at=utcnow())
-            self.state.publish('call.started', {k: job[k] for k in ('call_id', 'direction', 'number')},
+            self.state.publish('call.started', {**{k: job[k] for k in ('call_id', 'direction', 'number')},
+                                               **({'test_call': True} if local_test else {})},
                                'evt_started_' + ident)
             async with OpenAI(key) as api:
                 completed = await handle_call(args, api, phone, gateway, call, stop,
                                               asyncio.Event(), listener, ticket)
                 job.update(status='summarizing', directory=str(completed.journal.directory))
                 self.state.save()
-                if completed.metadata.get('audio', {}).get('failures'):
+                if not local_test and completed.metadata.get('audio', {}).get('failures'):
                     self.hardware_error = 'Call audio cleanup failed; inspect Bluetooth before continuing'
                     self.listen_stop.set()
                 self.active = None
@@ -342,7 +370,7 @@ class Runtime:
             await self.release_phone()
             self.released.pop(ident).set()
             if result is not None:
-                if self.hardware_error:
+                if self.hardware_error and not local_test:
                     result.update(cleanup_ok=False, error=self.hardware_error)
                 self.state.finish(ident, result)
 

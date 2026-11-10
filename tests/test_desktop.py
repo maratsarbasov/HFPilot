@@ -48,6 +48,12 @@ class DesktopTests(unittest.TestCase):
         result = desktop.save_context('Merged owner instructions.',current['revision'])
         self.assertEqual(result['text'],self.context.read_text())
 
+    def test_history_distinguishes_an_active_call_from_a_pending_report(self):
+        self.assertIn('Call in progress', desktop.summary_text({}, {'outcome': 'starting', 'summary_status': 'pending'}))
+        for phase in ('pending', 'running'):
+            self.assertIn('being saved', desktop.summary_text({}, {'outcome': 'stopped', 'summary_status': phase}))
+        self.assertIn('No summary', desktop.summary_text({}, {'outcome': 'failed', 'summary_status': 'failed'}))
+
     def test_api_key_is_private_and_never_returned_by_overview(self):
         key = 'test-only-private-key-value'
         self.assertEqual(desktop.save_key(key),{'saved':True})

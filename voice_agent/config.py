@@ -75,12 +75,12 @@ def load_call_settings(config_path, assignment_path=None):
     return agent, assignment, path
 
 
-def configuration(agent, assignment, now, caller=None, *, outgoing_number=None):
+def configuration(agent, assignment, now, caller=None, *, outgoing_number=None, direction=None):
     """Build both system prompts from the same assignment and factual context."""
     if not assignment.strip():
         raise ValueError('Assignment prompt is empty')
     context = {'local_time': now,
-               'direction': 'outgoing' if outgoing_number is not None else 'incoming',
+               'direction': direction or ('outgoing' if outgoing_number is not None else 'incoming'),
                'dialed_number': outgoing_number,
                'caller_id': caller if caller is not None else unknown_caller(),
                'caller_id_revision': 0}

@@ -33,49 +33,85 @@ struct SettingsPane: View {
     let perform: (Action) -> Void
 
     private var state: SettingsDisplay { presentation.display }
-    private func caption(_ title: String, _ detail: String, symbol: String) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: symbol).font(.system(size: 17)).foregroundStyle(.secondary)
-                .frame(width: 23).accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                Text(detail).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            }
-        }.padding(.vertical, 3)
+    private func row<Control: View>(_ title: String, detail: String? = nil, symbol: String,
+                                    @ViewBuilder control: () -> Control) -> some View {
+        HStack(spacing: 16) {
+            HStack(spacing: 10) {
+                Image(systemName: symbol)
+                    .font(.system(size: 16)).foregroundStyle(.secondary)
+                    .frame(width: 20).accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title).font(.system(size: 13, weight: .medium))
+                    if let detail {
+                        Text(detail).font(.system(size: 12)).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }.frame(maxWidth: .infinity, alignment: .leading)
+            control().fixedSize().controlSize(.regular)
+        }
+        .frame(minHeight: 24)
+        .padding(.horizontal, 14).padding(.vertical, 10)
     }
+
+    private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title).font(.system(size: 13, weight: .semibold)).accessibilityAddTraits(.isHeader)
+            VStack(spacing: 0, content: content)
+                .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10)
+                    .strokeBorder(Color(nsColor: .separatorColor).opacity(0.5), lineWidth: 0.5))
+        }.frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var divider: some View { Divider().padding(.horizontal, 14) }
+
     var body: some View {
-        Form {
-            Section("Assistant") {
-                Toggle(isOn: Binding(get: { state.enabled }, set: { perform(.enable($0)) })) {
-                    caption("Answer incoming calls", state.activeCall && state.enabled ? "Pausing will let this call finish." : state.status, symbol: "waveform")
-                }.toggleStyle(.switch).disabled(!state.canToggle)
-                Toggle(isOn: Binding(get: { state.recordAudio }, set: { perform(.recording($0)) })) {
-                    caption("Record call audio", state.recordingDetail, symbol: "waveform.circle")
-                }.toggleStyle(.switch).disabled(!state.canToggleRecording)
-                LabeledContent {
-                    Button(state.hasKey ? "Change…" : "Add Key…") { perform(.key) }
-                } label: {
-                    caption("OpenAI API key", state.hasKey ? "Key saved on this Mac" : "Required to answer calls", symbol: "key")
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                section("Assistant") {
+                    row("Answer incoming calls", detail: state.activeCall && state.enabled ?
+                        "Pausing will let this call finish." : state.status, symbol: "waveform") {
+                        Toggle("Answer incoming calls", isOn: Binding(get: { state.enabled }, set: { perform(.enable($0)) }))
+                            .labelsHidden().toggleStyle(.switch).disabled(!state.canToggle)
+                    }
+                    divider
+                    row("Record call audio", detail: state.recordingDetail, symbol: "waveform.circle") {
+                        Toggle("Record call audio", isOn: Binding(get: { state.recordAudio }, set: { perform(.recording($0)) }))
+                            .labelsHidden().toggleStyle(.switch).disabled(!state.canToggleRecording)
+                    }
+                    divider
+                    row("OpenAI API key", detail: state.hasKey ? "Key saved on this Mac" : "Required for calls and tests", symbol: "key") {
+                        Button(state.hasKey ? "Change…" : "Add Key…") { perform(.key) }
+                    }
+                }
+                section("Connections") {
+                    row(state.phone, detail: state.phoneStatus, symbol: "iphone") {
+                        Button(state.savedPhone ? "Manage…" : "Set Up…") { perform(.phone) }
+                    }
+                    divider
+                    row("Assistant connections", detail: tunnel.isRunning ? "OpenAI Tunnel · \(tunnel.state.capitalized)" :
+                        (state.publicURL == nil ? "Local MCP server" : "Public address saved"), symbol: "cable.connector") {
+                        Button("Details…") { showingConnections = true }
+                    }
+                }
+                section("Local files") {
+                    row("Activity log", symbol: "doc.text") {
+                        Button("Open Log") { perform(.log) }
+                    }
+                    divider
+                    row("Agent configuration", symbol: "slider.horizontal.3") {
+                        Button("Open Configuration…") { perform(.configuration) }
+                    }
+                }
+                if let note = state.note, !note.isEmpty {
+                    Text(note).font(.system(size: 12)).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            Section("Connections") {
-                LabeledContent {
-                    Button(state.savedPhone ? "Manage…" : "Set Up…") { perform(.phone) }
-                } label: { caption(state.phone, state.phoneStatus, symbol: "iphone") }
-                LabeledContent {
-                    Button("Details…") { showingConnections = true }
-                } label: { caption("Assistant connections", tunnel.isRunning ? "OpenAI Tunnel · \(tunnel.state.capitalized)" : (state.publicURL == nil ? "Local MCP server" : "Public address saved"), symbol: "cable.connector") }
-            }
-            if let note = state.note { Text(note).font(.callout).foregroundStyle(.secondary) }
-            Section("Local files") {
-                LabeledContent("Activity log") {
-                    Button("Open Log") { perform(.log) }
-                }
-                LabeledContent("Agent configuration") {
-                    Button("Open Configuration…") { perform(.configuration) }
-                }
-            }
-        }.formStyle(.grouped)
+            .padding(.horizontal, 24).padding(.vertical, 20)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
         .sheet(isPresented: $showingConnections) {
             AssistantConnections(presentation: presentation, tunnel: tunnel, bridge: bridge, didUpdate: didUpdateConnections)
         }
