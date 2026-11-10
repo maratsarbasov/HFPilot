@@ -17,6 +17,7 @@ struct SettingsDisplay: Equatable {
     var suggestedURL: String?
     var hasKey = false
     var note: String?
+    var voice = VoiceSettings()
 }
 
 final class SettingsPresentation: ObservableObject {
@@ -28,7 +29,9 @@ struct SettingsPane: View {
     @ObservedObject var tunnel: TunnelController
     let bridge: DesktopBridge
     let didUpdateConnections: ([String: Any]) -> Void
+    let didUpdateVoice: ([String: Any]) -> Void
     @State private var showingConnections = false
+    @State private var showingVoices = false
     enum Action { case enable(Bool), recording(Bool), phone, key, log, configuration }
     let perform: (Action) -> Void
 
@@ -70,6 +73,12 @@ struct SettingsPane: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 section("Assistant") {
+                    row("Assistant voice", detail: state.voice.error ?? (state.voice.name.isEmpty ? "Loading voices…" :
+                        state.voice.model != "gpt-live-1" ? "Voice selection is available for gpt-live-1" :
+                        "\(state.voice.name) · Used for calls and tests"), symbol: "person.wave.2") {
+                        Button("Choose Voice…") { showingVoices = true }.disabled(!state.voice.canChoose)
+                    }
+                    divider
                     row("Answer incoming calls", detail: state.activeCall && state.enabled ?
                         "Pausing will let this call finish." : state.status, symbol: "waveform") {
                         Toggle("Answer incoming calls", isOn: Binding(get: { state.enabled }, set: { perform(.enable($0)) }))
@@ -114,6 +123,9 @@ struct SettingsPane: View {
         }
         .sheet(isPresented: $showingConnections) {
             AssistantConnections(presentation: presentation, tunnel: tunnel, bridge: bridge, didUpdate: didUpdateConnections)
+        }
+        .sheet(isPresented: $showingVoices) {
+            VoicePicker(presentation: presentation, bridge: bridge, didSave: didUpdateVoice)
         }
     }
 }

@@ -73,6 +73,7 @@ final class LibraryWindow: NSWindowController, NSTableViewDataSource, NSTableVie
     private var settingsMessage: String?
     private var recordingSettings: [String: Any] = [:]
     private var savingRecording = false
+    private var voiceSettings = VoiceSettings()
 
     init(bridge: DesktopBridge, tunnel: TunnelController, control: @escaping (String) -> Void, setupPhone: @escaping () -> Void,
          openBluetooth: @escaping () -> Void) {
@@ -370,6 +371,9 @@ final class LibraryWindow: NSWindowController, NSTableViewDataSource, NSTableVie
             didUpdateConnections: { [weak self] info in
                 self?.runtime["connections"] = info
                 self?.renderPreferences()
+            }, didUpdateVoice: { [weak self] info in
+                self?.voiceSettings = VoiceSettings(info)
+                self?.renderPreferences()
             }) { [weak self] action in
             guard let self = self else { return }
             switch action {
@@ -471,7 +475,7 @@ final class LibraryWindow: NSWindowController, NSTableViewDataSource, NSTableVie
         RunLoop.main.perform(inModes: [.default]) { [weak self] in self?.bringToFront() }
     }
     private func selectPage(_ index: Int) {
-        if index == 3 { player?.stop(); player = nil }
+        if index != 0 { player?.stop(); player = nil }
         pageTitle.stringValue = Self.pageNames[index]
         window?.title = pageTitle.stringValue
         for (position, view) in pageViews.enumerated() { view.isHidden = position != index }
@@ -494,6 +498,7 @@ final class LibraryWindow: NSWindowController, NSTableViewDataSource, NSTableVie
             }
             let data = result.object
             self.recordingSettings = data["recording"] as? [String: Any] ?? [:]
+            self.voiceSettings = VoiceSettings(data["voice"] as? [String: Any] ?? [:])
             self.configured = data["api_key_configured"] as? Bool == true
             self.keyLabel.stringValue = self.configured ? "API key configured. Updates apply to future calls." : "Add an API key to enable the assistant."
             let phone = data["phone"] as? [String: Any]
@@ -581,7 +586,8 @@ final class LibraryWindow: NSWindowController, NSTableViewDataSource, NSTableVie
             canToggleRecording: !recording.isEmpty && !savingRecording && !recordingOverride && operation == nil,
             recordingDetail: recordingDetail,
             phone: phoneName, phoneStatus: phoneSummary, savedPhone: savedPhone, serverRunning: statusKnown ? state["listening"] != nil : nil,
-            publicURL: publicURL, suggestedURL: connections?["suggested_url"] as? String, hasKey: configured, note: note)
+            publicURL: publicURL, suggestedURL: connections?["suggested_url"] as? String, hasKey: configured, note: note,
+            voice: voiceSettings)
         if display != preferences.display { preferences.display = display }
         resizeSettingsSheet()
     }

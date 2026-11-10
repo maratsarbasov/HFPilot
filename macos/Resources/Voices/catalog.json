@@ -1,0 +1,257 @@
+{
+  "model": "gpt-live-1",
+  "source": "https://developers.openai.com/api/docs/guides/live-conversations#voice-options",
+  "sample_text": {
+    "en": "Hello! How can I help you today?"
+  },
+  "voices": [
+    {
+      "id": "marin",
+      "name": "Marin",
+      "language": "English",
+      "accent": "",
+      "presentation": "",
+      "group": "Original voices"
+    },
+    {
+      "id": "cedar",
+      "name": "Cedar",
+      "language": "English",
+      "accent": "",
+      "presentation": "",
+      "group": "Original voices"
+    },
+    {
+      "id": "alloy",
+      "name": "Alloy",
+      "language": "English",
+      "accent": "",
+      "presentation": "",
+      "group": "Original voices"
+    },
+    {
+      "id": "ash",
+      "name": "Ash",
+      "language": "English",
+      "accent": "",
+      "presentation": "",
+      "group": "Original voices"
+    },
+    {
+      "id": "ballad",
+      "name": "Ballad",
+      "language": "English",
+      "accent": "",
+      "presentation": "",
+      "group": "Original voices"
+    },
+    {
+      "id": "coral",
+      "name": "Coral",
+      "language": "English",
+      "accent": "",
+      "presentation": "",
+      "group": "Original voices"
+    },
+    {
+      "id": "echo",
+      "name": "Echo",
+      "language": "English",
+      "accent": "",
+      "presentation": "",
+      "group": "Original voices"
+    },
+    {
+      "id": "sage",
+      "name": "Sage",
+      "language": "English",
+      "accent": "",
+      "presentation": "",
+      "group": "Original voices"
+    },
+    {
+      "id": "shimmer",
+      "name": "Shimmer",
+      "language": "English",
+      "accent": "",
+      "presentation": "",
+      "group": "Original voices"
+    },
+    {
+      "id": "verse",
+      "name": "Verse",
+      "language": "English",
+      "accent": "",
+      "presentation": "",
+      "group": "Original voices"
+    },
+    {
+      "id": "quartz",
+      "name": "Quartz",
+      "language": "English",
+      "accent": "Australian",
+      "presentation": "Feminine",
+      "group": "Additional voices"
+    },
+    {
+      "id": "ripple",
+      "name": "Ripple",
+      "language": "English",
+      "accent": "Australian",
+      "presentation": "Masculine",
+      "group": "Additional voices"
+    },
+    {
+      "id": "vesper",
+      "name": "Vesper",
+      "language": "English",
+      "accent": "British",
+      "presentation": "Masculine",
+      "group": "Additional voices"
+    },
+    {
+      "id": "willow",
+      "name": "Willow",
+      "language": "English",
+      "accent": "Irish",
+      "presentation": "Feminine",
+      "group": "Additional voices"
+    },
+    {
+      "id": "stone",
+      "name": "Stone",
+      "language": "English",
+      "accent": "Irish",
+      "presentation": "Masculine",
+      "group": "Additional voices"
+    },
+    {
+      "id": "gleam",
+      "name": "Gleam",
+      "language": "English",
+      "accent": "North American",
+      "presentation": "Feminine",
+      "group": "Additional voices"
+    },
+    {
+      "id": "meridian",
+      "name": "Meridian",
+      "language": "English",
+      "accent": "North American",
+      "presentation": "Masculine",
+      "group": "Additional voices"
+    },
+    {
+      "id": "bossa",
+      "name": "Bossa",
+      "language": "Portuguese",
+      "accent": "Brazilian",
+      "presentation": "Feminine",
+      "group": "Additional voices"
+    },
+    {
+      "id": "tempo",
+      "name": "Tempo",
+      "language": "Portuguese",
+      "accent": "Brazilian",
+      "presentation": "Masculine",
+      "group": "Additional voices"
+    },
+    {
+      "id": "beacon",
+      "name": "Beacon",
+      "language": "English",
+      "accent": "Filipino",
+      "presentation": "Masculine",
+      "group": "Additional voices"
+    },
+    {
+      "id": "delta",
+      "name": "Delta",
+      "language": "English",
+      "accent": "Southern U.S.",
+      "presentation": "Feminine",
+      "group": "Additional voices"
+    },
+    {
+      "id": "cinder",
+      "name": "Cinder",
+      "language": "English",
+      "accent": "Southern U.S.",
+      "presentation": "Masculine",
+      "group": "Additional voices"
+    },
+    {
+      "id": "nuri",
+      "name": "Nuri",
+      "language": "German",
+      "accent": "",
+      "presentation": "Feminine",
+      "group": "Additional voices"
+    },
+    {
+      "id": "juni",
+      "name": "Juni",
+      "language": "German",
+      "accent": "",
+      "presentation": "Feminine",
+      "group": "Additional voices"
+    },
+    {
+      "id": "flitz",
+      "name": "Flitz",
+      "language": "German",
+      "accent": "",
+      "presentation": "Masculine",
+      "group": "Additional voices"
+    },
+    {
+      "id": "brise",
+      "name": "Brise",
+      "language": "French",
+      "accent": "",
+      "presentation": "Feminine",
+      "group": "Additional voices"
+    },
+    {
+      "id": "sillage",
+      "name": "Sillage",
+      "language": "French",
+      "accent": "",
+      "presentation": "Masculine",
+      "group": "Additional voices"
+    },
+    {
+      "id": "nira",
+      "name": "Nira",
+      "language": "Hindi",
+      "accent": "",
+      "presentation": "Feminine",
+      "group": "Additional voices"
+    },
+    {
+      "id": "harema",
+      "name": "Harema",
+      "language": "Japanese",
+      "accent": "",
+      "presentation": "Feminine",
+      "group": "Additional voices"
+    },
+    {
+      "id": "shida",
+      "name": "Shida",
+      "language": "Japanese",
+      "accent": "",
+      "presentation": "Masculine",
+      "group": "Additional voices"
+    },
+    {
+      "id": "noeul",
+      "name": "Noeul",
+      "language": "Korean",
+      "accent": "",
+      "presentation": "Feminine",
+      "group": "Additional voices"
+    }
+  ]
+}

@@ -7,7 +7,7 @@ from .config import ROOT, load_config
 from .live import api_key
 from .mcp_state import State, atomic_text
 from .phone_profile import load as load_phone, display_name
-from . import recording
+from . import recording, voices
 
 
 def read_json(path):
@@ -99,12 +99,17 @@ def overview():
         phone = None
     return {'calls': conversations(), 'context': context, 'configuration_error': error,
             'api_key_configured': configured,
+            'voice': voices.settings(ROOT / 'agent.toml'),
             'recording': recording.status(ROOT / '.work/mcp/record-audio'),
             'phone': {'name': phone['name'], 'address': phone['address']} if phone else None}
 
 
 def save_recording(value):
     return recording.save(value, ROOT / '.work/mcp/record-audio')
+
+
+def save_voice(value, revision):
+    return voices.save(ROOT / 'agent.toml', value, revision)
 
 
 def save_context(text, revision):

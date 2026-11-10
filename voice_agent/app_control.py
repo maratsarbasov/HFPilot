@@ -139,6 +139,13 @@ def desktop_request(data, payload):
         return request_local('/local/test-call', payload, timeout=5)
     if action == 'save_recording':
         return desktop.save_recording(payload.get('enabled'))
+    if action == 'save_voice':
+        return desktop.save_voice(payload.get('voice'), payload.get('revision'))
+    if action == 'voice_preview':
+        from voice_agent.voice_preview import run
+        if alive(data.get('server', {})) and runtime_status()['active_call_id']:
+            raise ValueError('Finish the current call before previewing voices')
+        return run(payload.get('voice'), payload.get('language'))
     if action == 'connection_address':
         from voice_agent.mcp_connections import save_origin
         command, url = payload.get('command'), payload.get('url')
@@ -210,6 +217,12 @@ def main():
         except ValueError:
             print(json.dumps({'error': 'Invalid desktop request'}))
             raise SystemExit(1)
+        # A finite preview owns only its API connection. Do not hold the phone's
+        # control lock while generating: calls, shutdown and saves remain usable.
+        if payload.get('action') == 'voice_preview':
+            data = json.loads(RECORD.read_text()) if RECORD.exists() else {}
+            desktop_response(data, payload)
+            return
         # Read-only windows stay usable while a control command holds the lock.
         if payload.get('action') in ('overview', 'call_details') or (
                 payload.get('action') == 'test_call' and payload.get('command') == 'status'):

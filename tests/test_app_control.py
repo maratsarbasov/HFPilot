@@ -115,6 +115,21 @@ class LocalControlTests(unittest.TestCase):
                 self.main('desktop')
                 read.assert_called_once_with({}, status)
 
+    def test_voice_preview_does_not_lock_phone_controls_and_refuses_an_active_call(self):
+        payload = {'action': 'voice_preview', 'voice': 'marin', 'language': 'Russian'}
+        with (self.root / 'control.lock').open('a') as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            with patch('sys.stdin', io.StringIO(json.dumps(payload))), \
+                 patch.object(bench, 'desktop_request', return_value={'audio': 'test'}) as request:
+                self.main('desktop')
+                request.assert_called_once_with(self.data, payload)
+        with patch.object(bench, 'alive', return_value=True), \
+             patch.object(bench, 'runtime_status', return_value={'active_call_id': 'call'}), \
+             patch('voice_agent.voice_preview.run') as generate:
+            with self.assertRaisesRegex(ValueError, 'Finish the current call'):
+                bench.desktop_request(self.data, payload)
+            generate.assert_not_called()
+
     def test_restart_preserves_pause_and_refuses_calls_or_pending_summaries(self):
         for enabled, call, pending in ((False, None, 0), (True, None, 0),
                                        (True, 'active', 0), (False, None, 1)):

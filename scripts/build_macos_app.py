@@ -96,6 +96,9 @@ def main():
                         target.parent.mkdir(parents=True, exist_ok=True)
                         shutil.copy2(source, target)
     assert (contents / 'MacOS/HFPilotBackend').is_file(), 'Build the backend before --ui-only'
+    # UI-only builds must also drop voice samples removed from the source set.
+    if (resources / 'Voices').exists():
+        shutil.rmtree(resources / 'Voices')
     shutil.copytree(ROOT / 'macos/Resources', resources, dirs_exist_ok=True)
     build_icon(resources)
     defaults = resources / 'Defaults'
