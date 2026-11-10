@@ -195,6 +195,8 @@ git push origin v0.1.1
 
 Use a new tag in `vMAJOR.MINOR.PATCH` format for each release. The tag determines the version inside the app; CI uses its run number as the internal build number. Existing releases are not overwritten.
 
+To publish under your own GitHub account, save a draft release for the new tag before pushing it. The workflow adds the checked build and publishes that draft, preserving its author, title, and release notes.
+
 For a build without publishing, open **Actions → Release macOS app → Run workflow**. Download the result from the run's **Artifacts** section. Manual builds use `VERSION`; keep that file current for local and manual builds. The workflow must first be pushed to the repository's default branch to appear in Actions.
 
 ## Similar projects

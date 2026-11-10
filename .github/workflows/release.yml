@@ -100,7 +100,18 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
           (cd dist && sha256sum --check SHA256SUMS)
-          gh release create "$RELEASE_TAG" \
-            dist/HFPilot-macOS-arm64.zip dist/SHA256SUMS \
-            --repo "$GITHUB_REPOSITORY" --verify-tag \
-            --title "HFPilot $RELEASE_TAG" --generate-notes --notes-file dist/release-notes.md
+          if draft="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)"; then
+            if [[ "$draft" != true ]]; then
+              echo 'Refusing to overwrite an already published release.'
+              exit 1
+            fi
+            # Keep the author's title and notes when publishing a prepared draft.
+            gh release upload "$RELEASE_TAG" dist/HFPilot-macOS-arm64.zip dist/SHA256SUMS \
+              --repo "$GITHUB_REPOSITORY"
+            gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false
+          else
+            gh release create "$RELEASE_TAG" \
+              dist/HFPilot-macOS-arm64.zip dist/SHA256SUMS \
+              --repo "$GITHUB_REPOSITORY" --verify-tag \
+              --title "HFPilot $RELEASE_TAG" --generate-notes --notes-file dist/release-notes.md
+          fi
