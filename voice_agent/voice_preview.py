@@ -95,7 +95,7 @@ async def generate(voice, language):
     try:
         async with asyncio.timeout(30):
             await peer.setLocalDescription(await peer.createOffer())
-            config = {'model': 'gpt-live-1', 'store': False, 'delegation': {'type': 'client'},
+            config = {'model': 'gpt-live-1.1', 'store': False, 'delegation': {'type': 'client'},
                       'audio': {'output': {'voice': voice}},
                       'instructions': f'Record one short voice sample in {language}. When prompted, '
                           f'say a natural translation of "{GREETING}" exactly once in {language}. '

@@ -34,7 +34,8 @@ struct VoiceSettings: Equatable {
         error = data["error"] as? String
     }
     var name: String { VoiceOption.all.first { $0.id == current }?.name ?? current }
-    var canChoose: Bool { model == "gpt-live-1" && !revision.isEmpty && error == nil }
+    var supportsModel: Bool { ["gpt-live-1", "gpt-live-1.1"].contains(model) }
+    var canChoose: Bool { supportsModel && !revision.isEmpty && error == nil }
 }
 
 final class VoiceSamplePlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {

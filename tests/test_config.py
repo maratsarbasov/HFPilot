@@ -17,7 +17,7 @@ def write_config(root):
     assignment = root/'task.txt'
     assignment.write_text('Speak French. Ask when the parcel can be collected.')
     text = DEFAULT_CONFIG.read_text().replace(load_config().data['agent']['default_assignment'], 'task.txt')
-    text = text.replace('model = "gpt-live-1"', 'model = "voice-test"')
+    text = text.replace('model = "gpt-live-1.1"', 'model = "voice-test"')
     text = text.replace('voice = "marin"', 'voice = "voice-from-config"')
     text = text.replace('[summary]\nmodel = "gpt-6.1-sol"', '[summary]\nmodel = "summary-test"')
     text = text.replace('model = "gpt-6.1-sol"', 'model = "backend-test"')

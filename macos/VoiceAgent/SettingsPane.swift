@@ -74,7 +74,7 @@ struct SettingsPane: View {
             VStack(alignment: .leading, spacing: 20) {
                 section("Assistant") {
                     row("Assistant voice", detail: state.voice.error ?? (state.voice.name.isEmpty ? "Loading voices…" :
-                        state.voice.model != "gpt-live-1" ? "Voice selection is available for gpt-live-1" :
+                        !state.voice.supportsModel ? "Voice selection is available for gpt-live-1 and gpt-live-1.1" :
                         "\(state.voice.name) · Used for calls and tests"), symbol: "person.wave.2") {
                         Button("Choose Voice…") { showingVoices = true }.disabled(!state.voice.canChoose)
                     }

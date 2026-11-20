@@ -50,7 +50,7 @@ class VoiceTests(unittest.TestCase):
             voices.save(self.path, 'cedar', voices.settings(self.path)['revision'])
 
     def test_other_models_and_broken_configuration_remain_untouched(self):
-        self.path.write_text(self.path.read_text().replace('gpt-live-1', 'another-model'))
+        self.path.write_text(self.path.read_text().replace('gpt-live-1.1', 'another-model'))
         original = self.path.read_bytes()
         with self.assertRaisesRegex(ValueError, 'gpt-live-1'):
             voices.save(self.path, 'cedar', voices.settings(self.path)['revision'])

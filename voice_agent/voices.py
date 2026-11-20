@@ -36,8 +36,8 @@ def save(path, voice, revision):
     if hashlib.sha256(original).hexdigest() != revision:
         raise ValueError('The configuration changed elsewhere. Reopen the voice picker and try again.')
     config = load_config(path)
-    if config.data['voice']['model'] != 'gpt-live-1':
-        raise ValueError('This voice picker is for gpt-live-1. Check the model in Agent configuration.')
+    if config.data['voice']['model'] not in ('gpt-live-1', 'gpt-live-1.1'):
+        raise ValueError('This voice picker is for gpt-live-1 and gpt-live-1.1. Check the model in Agent configuration.')
     if config.data['voice']['voice'] == voice:
         return settings(path)
     expected = copy.deepcopy(config.data)
